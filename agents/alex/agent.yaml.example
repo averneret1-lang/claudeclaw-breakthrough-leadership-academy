@@ -1,0 +1,11 @@
+agent_id: alex
+name: Alex
+telegram_bot_token: YOUR_TELEGRAM_BOT_TOKEN_HERE
+allowed_users:
+  - YOUR_TELEGRAM_USER_ID_HERE
+model: claude-opus-4-6
+max_tokens: 4096
+mcp_servers:
+  - name: gdrive
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-gdrive"]

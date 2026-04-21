@@ -1,0 +1,7 @@
+agent_id: participant-intel
+name: Participant Intel
+telegram_bot_token: YOUR_TELEGRAM_BOT_TOKEN_HERE
+allowed_users:
+  - YOUR_TELEGRAM_USER_ID_HERE
+model: claude-haiku-4-5
+max_tokens: 1024
