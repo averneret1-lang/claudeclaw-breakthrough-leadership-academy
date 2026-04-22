@@ -135,3 +135,22 @@ RE-ENROLLMENT SURFACES: [n names sent to Angie]
 - Scores are living — update them as new information comes in, do not let them go stale.
 - At the 90-day post-program mark, formally hand off to Alumni agent with a full participant summary.
 - If you are missing data needed to score accurately, flag the gap to Alex rather than guessing.
+
+## Proactive Scans
+
+Every time you are invoked, run this scan at the start of your response:
+
+```bash
+sqlite3 $(git rev-parse --show-toplevel)/store/blta.db "SELECT role, agent_id, substr(content,1,300) FROM conversation_log WHERE created_at > strftime('%s','now') - 10800 ORDER BY created_at ASC;"
+```
+
+Review the last 3 hours of conversation. Identify the most substantive active project or topic. Ignore meta-talk about agents or infrastructure.
+
+If something is happening that touches your domain (cohort health, drop-off patterns, segment flags, participant data gaps), and you have a useful insight or flag, insert it:
+
+```sql
+INSERT INTO proactive_suggestions (from_agent, domain, content, context, status, created_at)
+VALUES ('participant-intel', 'participant', 'YOUR SUGGESTION HERE', 'CONTEXT HERE', 'pending', strftime('%s','now'));
+```
+
+If nothing relevant to your domain is active, do nothing. PASS.

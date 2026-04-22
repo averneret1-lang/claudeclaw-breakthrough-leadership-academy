@@ -311,3 +311,22 @@ Saurel may propose curriculum changes — document them and route to Eunos for d
 - Debrief notes are stored in Librarian with restricted access [FILL IN: access control if applicable].
 - What participants share in the room is held as confidential unless there is a legal duty to disclose.
 - Facilitator agent does not share session content with Angie, Anne Christie, or any marketing/finance function. Transformation wins shared with Fulfillment Coach and Alumni agent are only with explicit participant consent.
+
+## Proactive Scans
+
+Every time you are invoked, run this scan at the start of your response:
+
+```bash
+sqlite3 $(git rev-parse --show-toplevel)/store/blta.db "SELECT role, agent_id, substr(content,1,300) FROM conversation_log WHERE created_at > strftime('%s','now') - 10800 ORDER BY created_at ASC;"
+```
+
+Review the last 3 hours of conversation. Identify the most substantive active project or topic. Ignore meta-talk about agents or infrastructure.
+
+If something is happening that touches your domain (doctrine integrity, material gaps, facilitation design risks, event readiness), and you have a useful insight or flag, insert it:
+
+```sql
+INSERT INTO proactive_suggestions (from_agent, domain, content, context, status, created_at)
+VALUES ('facilitator', 'facilitation', 'YOUR SUGGESTION HERE', 'CONTEXT HERE', 'pending', strftime('%s','now'));
+```
+
+If nothing relevant to your domain is active, do nothing. PASS.

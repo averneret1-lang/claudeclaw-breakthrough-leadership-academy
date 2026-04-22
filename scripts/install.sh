@@ -83,6 +83,42 @@ npm install
 echo "Building project..."
 npm run build
 
+# ─── Database ─────────────────────────────────────────────────────────────────
+
+echo ""
+echo "Initializing database..."
+mkdir -p store
+chmod 700 store
+
+if command -v sqlite3 &>/dev/null; then
+  for sql in migrations/*.sql; do
+    [ -f "$sql" ] || continue
+    sqlite3 store/claudeclaw.db < "$sql" 2>/dev/null || true
+    echo "  Applied $(basename $sql)"
+  done
+  chmod 600 store/claudeclaw.db
+  echo "Database ready."
+else
+  echo "  sqlite3 not found — run migrations/*.sql manually after install."
+fi
+
+# ─── Launchd (macOS) ──────────────────────────────────────────────────────────
+
+OS=$(uname)
+if [ "$OS" = "Darwin" ] && [ -d launchd ]; then
+  echo ""
+  echo "Registering background services (macOS)..."
+  mkdir -p "$HOME/Library/Logs/blta"
+  for plist in launchd/*.plist; do
+    [ -f "$plist" ] || continue
+    DEST="$HOME/Library/LaunchAgents/$(basename $plist)"
+    sed "s|__PROJECT_DIR__|$(pwd)|g; s|__HOME__|$HOME|g" "$plist" > "$DEST"
+    launchctl unload "$DEST" 2>/dev/null || true
+    launchctl load "$DEST" 2>/dev/null || true
+    echo "  Loaded $(basename $plist)"
+  done
+fi
+
 echo ""
 echo "================================================"
 echo "  Installation complete."

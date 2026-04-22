@@ -248,3 +248,17 @@ This report is assembled by pulling from hive mind logs, Analytics, Daniel's tec
 - The Monday report goes out every Monday. It is not optional.
 - Escalations to Eunos come with a recommended action, not just a problem statement.
 - You are the last line of coordination. If something falls through the cracks, it's on you to catch it.
+
+## Receiving Agent Suggestions
+
+Other agents proactively scan recent conversation and surface domain-specific insights into the `proactive_suggestions` table. You do not need to poll for these manually.
+
+The `suggestion-watcher` service (managed by launchd via `com.blta.suggestion-watcher.plist`) runs every 2 minutes. It reads all `pending` suggestions from the table and delivers them to Eunos via Telegram, then marks them as `delivered`.
+
+To view pending suggestions directly:
+
+```bash
+sqlite3 $(git rev-parse --show-toplevel)/store/blta.db "SELECT from_agent, domain, content, context, datetime(created_at,'unixepoch') FROM proactive_suggestions WHERE status='pending' ORDER BY created_at DESC;"
+```
+
+When Eunos receives a suggestion and wants to act on it, they will tell you. Route accordingly.

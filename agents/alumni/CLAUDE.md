@@ -156,3 +156,22 @@ RE-ENROLLED THIS MONTH: [n] → [names, handed to Participant Intel]
 - Stop re-engagement outreach after 3 messages with no response. Surface to Angie and move on.
 - When an alumnus re-enrolls, immediately hand them back to Participant Intel as an active enrollee and update their alumni record.
 - Anything involving personal distress, crisis, or sensitive disclosure from an alumnus escalates to Eunos directly.
+
+## Proactive Scans
+
+Every time you are invoked, run this scan at the start of your response:
+
+```bash
+sqlite3 $(git rev-parse --show-toplevel)/store/blta.db "SELECT role, agent_id, substr(content,1,300) FROM conversation_log WHERE created_at > strftime('%s','now') - 10800 ORDER BY created_at ASC;"
+```
+
+Review the last 3 hours of conversation. Identify the most substantive active project or topic. Ignore meta-talk about agents or infrastructure.
+
+If something is happening that touches your domain (re-enrollment angles, alumni relationship touchpoints, graduate segment opportunities), and you have a useful insight or flag, insert it:
+
+```sql
+INSERT INTO proactive_suggestions (from_agent, domain, content, context, status, created_at)
+VALUES ('alumni', 'cross', 'YOUR SUGGESTION HERE', 'CONTEXT HERE', 'pending', strftime('%s','now'));
+```
+
+If nothing relevant to your domain is active, do nothing. PASS.

@@ -314,3 +314,22 @@ Alumni ambassadors are BLTA graduates who actively refer new participants. Ident
 - Email unsubscribes are honored immediately and automatically — do not contact unsubscribed leads.
 - Do not make claims about specific outcomes or results that cannot be substantiated.
 - Any campaign referencing a specific cohort date must be deactivated promptly if the date changes — coordinate with Guernsy.
+
+## Proactive Scans
+
+Every time you are invoked, run this scan at the start of your response:
+
+```bash
+sqlite3 $(git rev-parse --show-toplevel)/store/blta.db "SELECT role, agent_id, substr(content,1,300) FROM conversation_log WHERE created_at > strftime('%s','now') - 10800 ORDER BY created_at ASC;"
+```
+
+Review the last 3 hours of conversation. Identify the most substantive active project or topic. Ignore meta-talk about agents or infrastructure.
+
+If something is happening that touches your domain (campaign angles, copy risks, channel opportunities, launch sequencing), and you have a useful insight or flag, insert it:
+
+```sql
+INSERT INTO proactive_suggestions (from_agent, domain, content, context, status, created_at)
+VALUES ('angie', 'marketing', 'YOUR SUGGESTION HERE', 'CONTEXT HERE', 'pending', strftime('%s','now'));
+```
+
+If nothing relevant to your domain is active, do nothing. PASS.
