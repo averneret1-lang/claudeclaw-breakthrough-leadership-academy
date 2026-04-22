@@ -25,22 +25,39 @@ if [ "$NODE_VER" -lt 20 ]; then
 fi
 
 if ! command -v git &>/dev/null; then
-  echo "ERROR: git not found."
-  exit 1
+  echo "Note: git not found — that's OK if you downloaded via ZIP."
 fi
 
 echo "Prerequisites OK."
 echo ""
 
-# API key
+# ─── Anthropic auth (OAuth) ───────────────────────────────────────────────────
+
 if [ ! -f .env ]; then
   cp .env.example .env
 fi
 
-echo "Enter your Anthropic API key:"
-read -r ANTHROPIC_KEY
-sed -i.bak "s|ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=$ANTHROPIC_KEY|" .env
-rm -f .env.bak
+echo "Setting up Anthropic authentication..."
+echo ""
+
+# Install claude CLI if missing
+if ! command -v claude &>/dev/null; then
+  echo "Installing Claude CLI..."
+  npm install -g @anthropic-ai/claude-code
+fi
+
+# Check if already authenticated
+if claude auth status &>/dev/null 2>&1; then
+  echo "Already logged in to Anthropic."
+else
+  echo "A browser window will open — sign in with your Anthropic account."
+  echo "If no browser opens, follow the URL printed below."
+  echo ""
+  claude auth login
+fi
+
+echo "Anthropic auth complete."
+echo ""
 
 echo ""
 echo "Now configure each agent. You need one Telegram bot token per agent."
@@ -131,4 +148,5 @@ echo "  Check status:"
 echo "    npm run status"
 echo "================================================"
 echo ""
+
 
