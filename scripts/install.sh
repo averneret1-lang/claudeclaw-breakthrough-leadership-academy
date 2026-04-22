@@ -43,7 +43,18 @@ echo ""
 # Install claude CLI if missing
 if ! command -v claude &>/dev/null; then
   echo "Installing Claude CLI..."
+  # Set npm global prefix to user home to avoid permission errors
+  mkdir -p "$HOME/.npm-global"
+  npm config set prefix "$HOME/.npm-global"
   npm install -g @anthropic-ai/claude-code
+  export PATH="$HOME/.npm-global/bin:$PATH"
+  # Persist to shell profile
+  PROFILE="$HOME/.zshrc"
+  [ -f "$HOME/.bash_profile" ] && PROFILE="$HOME/.bash_profile"
+  if ! grep -q '.npm-global/bin' "$PROFILE" 2>/dev/null; then
+    echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> "$PROFILE"
+  fi
+  echo "Claude CLI installed."
 fi
 
 # Check if already authenticated
