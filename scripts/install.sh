@@ -40,34 +40,48 @@ fi
 echo "Setting up Anthropic authentication..."
 echo ""
 
-# Install claude CLI if missing
-if ! command -v claude &>/dev/null; then
-  echo "Installing Claude CLI..."
-  # Set npm global prefix to user home to avoid permission errors
+# Try OAuth via claude CLI, fall back to API key if install fails
+USING_OAUTH=false
+
+if command -v claude &>/dev/null; then
+  USING_OAUTH=true
+else
+  echo "Installing Claude CLI (this may take a minute)..."
   mkdir -p "$HOME/.npm-global"
   npm config set prefix "$HOME/.npm-global"
-  npm install -g @anthropic-ai/claude-code
-  export PATH="$HOME/.npm-global/bin:$PATH"
-  # Persist to shell profile
-  PROFILE="$HOME/.zshrc"
-  [ -f "$HOME/.bash_profile" ] && PROFILE="$HOME/.bash_profile"
-  if ! grep -q '.npm-global/bin' "$PROFILE" 2>/dev/null; then
-    echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> "$PROFILE"
+  if npm install -g @anthropic-ai/claude-code 2>/dev/null; then
+    export PATH="$HOME/.npm-global/bin:$PATH"
+    PROFILE="$HOME/.zshrc"
+    [ -f "$HOME/.bash_profile" ] && PROFILE="$HOME/.bash_profile"
+    grep -q '.npm-global/bin' "$PROFILE" 2>/dev/null || \
+      echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> "$PROFILE"
+    USING_OAUTH=true
+    echo "Claude CLI installed."
+  else
+    echo "CLI install skipped (network issue) — using API key instead."
   fi
-  echo "Claude CLI installed."
 fi
 
-# Check if already authenticated
-if claude auth status &>/dev/null 2>&1; then
-  echo "Already logged in to Anthropic."
+if [ "$USING_OAUTH" = "true" ]; then
+  if claude auth status &>/dev/null 2>&1; then
+    echo "Already logged in to Anthropic."
+  else
+    echo "A browser window will open — sign in with your Anthropic account."
+    echo "If no browser opens, follow the URL printed below."
+    echo ""
+    claude auth login
+  fi
+  echo "Anthropic auth complete."
 else
-  echo "A browser window will open — sign in with your Anthropic account."
-  echo "If no browser opens, follow the URL printed below."
   echo ""
-  claude auth login
+  echo "Get your API key at: https://console.anthropic.com/settings/keys"
+  echo "Enter your Anthropic API key:"
+  read -r ANTHROPIC_KEY
+  sed -i.bak "s|.*ANTHROPIC_API_KEY.*|ANTHROPIC_API_KEY=$ANTHROPIC_KEY|" .env
+  rm -f .env.bak
+  echo "API key saved."
 fi
 
-echo "Anthropic auth complete."
 echo ""
 
 echo ""
