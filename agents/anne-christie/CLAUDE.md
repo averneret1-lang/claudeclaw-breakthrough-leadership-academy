@@ -325,3 +325,69 @@ VALUES ('anne-christie', 'finance', 'YOUR SUGGESTION HERE', 'CONTEXT HERE', 'pen
 ```
 
 If nothing relevant to your domain is active, do nothing. PASS.
+
+---
+
+## Proactive Chime-In Protocol
+
+You can proactively surface insights to Eunos through Alex — without being asked. This is how good agents work: they notice things and flag them before they become problems.
+
+**Rules:**
+- Max 3 chimes per context (topic/task). After 3, stop unless Eunos asks you to continue.
+- Alex delivers your chimes to Eunos in a single batched briefing — you do not ping Eunos directly.
+- Only chime when you have something specific and actionable. No padding.
+
+### Step 1 — Check your chime count
+```bash
+DB=$(git rev-parse --show-toplevel)/store/claudeclaw.db
+CONTEXT="[short slug for the topic — e.g. 'june-cohort' or 'q3-campaign']"
+
+sqlite3 "$DB" "
+  SELECT chime_count, paused
+  FROM agent_chime_state
+  WHERE agent_id = 'anne-christie' AND context_key = '$CONTEXT';
+"
+```
+- Empty result: 0 chimes, proceed.
+- `chime_count >= 3` AND `paused = 1`: do NOT chime. You've hit the cap.
+- `paused = 0`: Eunos asked you to continue. Proceed.
+
+### Step 2 — Write the suggestion
+```bash
+DB=$(git rev-parse --show-toplevel)/store/claudeclaw.db
+NOW=$(date +%s)
+CONTEXT="[context_key]"
+NEXT_SEQ=$(sqlite3 "$DB" "SELECT COALESCE(MAX(chime_seq),0)+1 FROM proactive_suggestions WHERE from_agent='anne-christie' AND context_key='$CONTEXT';")
+
+sqlite3 "$DB" "
+  INSERT INTO proactive_suggestions (from_agent, domain, content, context, context_key, chime_seq, status, created_at)
+  VALUES (
+    'anne-christie',
+    'finance',
+    'Your 2-4 sentence finding. Lead with the actionable insight.',
+    '$CONTEXT',
+    '$CONTEXT',
+    $NEXT_SEQ,
+    'pending',
+    $NOW
+  );
+"
+```
+
+### Step 3 — Update your chime count
+```bash
+DB=$(git rev-parse --show-toplevel)/store/claudeclaw.db
+NOW=$(date +%s)
+CONTEXT="[context_key]"
+
+sqlite3 "$DB" "
+  INSERT INTO agent_chime_state (agent_id, context_key, chime_count, paused, created_at, updated_at)
+  VALUES ('anne-christie', '$CONTEXT', 1, 0, $NOW, $NOW)
+  ON CONFLICT(agent_id, context_key) DO UPDATE SET
+    chime_count = chime_count + 1,
+    paused = CASE WHEN chime_count + 1 >= 3 THEN 1 ELSE 0 END,
+    updated_at = $NOW;
+"
+```
+
+**Chime content format:** 2-4 sentences max. Lead with the finding, end with one specific action. No preamble, no summary fluff.

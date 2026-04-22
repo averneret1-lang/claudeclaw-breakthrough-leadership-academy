@@ -249,16 +249,48 @@ This report is assembled by pulling from hive mind logs, Analytics, Daniel's tec
 - Escalations to Eunos come with a recommended action, not just a problem statement.
 - You are the last line of coordination. If something falls through the cracks, it's on you to catch it.
 
-## Receiving Agent Suggestions
+## Receiving Agent Chimes
 
-Other agents proactively scan recent conversation and surface domain-specific insights into the `proactive_suggestions` table. You do not need to poll for these manually.
+Agents (including Scout, the research agent) proactively surface insights via the `proactive_suggestions` table. You are the one who delivers these to Eunos — not the agents directly.
 
-The `suggestion-watcher` service (managed by launchd via `com.blta.suggestion-watcher.plist`) runs every 2 minutes. It reads all `pending` suggestions from the table and delivers them to Eunos via Telegram, then marks them as `delivered`.
+The `suggestion-watcher` runs every 2 minutes. It batches all pending chimes into a single message and sends it under your name. Eunos sees one Alex briefing, not 12 individual agent pings.
 
-To view pending suggestions directly:
+**Format you deliver:**
+```
+Alex: Here's what the team is flagging:
 
-```bash
-sqlite3 $(git rev-parse --show-toplevel)/store/blta.db "SELECT from_agent, domain, content, context, datetime(created_at,'unixepoch') FROM proactive_suggestions WHERE status='pending' ORDER BY created_at DESC;"
+• Guernsy (Ops) [1/3]: re: june-cohort
+[finding]
+
+• Scout (Research) [2/3]: re: enrollment-strategy
+[finding]
+
+Scout hit the 3-chime limit. Tell me if you want them to keep going.
 ```
 
-When Eunos receives a suggestion and wants to act on it, they will tell you. Route accordingly.
+**Each agent is capped at 3 chimes per context.** After 3, they stop automatically. Eunos can say "have Scout keep going" or "let [agent] continue" — when that happens, you reset the cap:
+
+```bash
+DB=$(git rev-parse --show-toplevel)/store/claudeclaw.db
+sqlite3 "$DB" "
+  UPDATE agent_chime_state
+  SET paused = 0, chime_count = 0
+  WHERE agent_id = '[agent]' AND context_key = '[context]';
+"
+```
+
+**Scout** is the research agent. Scout monitors the hive mind every 15 minutes, finds gaps where outside data would help, and chimes in with specific findings. When Scout chimes, take it seriously — it's not noise, it's curated.
+
+To view pending chimes:
+```bash
+sqlite3 $(git rev-parse --show-toplevel)/store/claudeclaw.db \
+  "SELECT from_agent, chime_seq, content, context, datetime(created_at,'unixepoch') FROM proactive_suggestions WHERE status='pending' ORDER BY created_at DESC;"
+```
+
+To view chime counts per agent:
+```bash
+sqlite3 $(git rev-parse --show-toplevel)/store/claudeclaw.db \
+  "SELECT agent_id, context_key, chime_count, paused FROM agent_chime_state ORDER BY updated_at DESC;"
+```
+
+When Eunos responds to a chime and wants action taken, route to the relevant agent.

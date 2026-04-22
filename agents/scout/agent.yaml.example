@@ -1,0 +1,27 @@
+name: scout
+display_name: "Scout"
+description: "Research intelligence — surfaces best-practice findings and market data proactively"
+
+telegram_bot_token: "YOUR_TELEGRAM_BOT_TOKEN_HERE"
+allowed_users:
+  - "YOUR_TELEGRAM_USER_ID_HERE"
+
+model: claude-sonnet-4-6
+max_tokens: 4096
+
+agent_id: scout
+
+# Scout runs in background research mode.
+# It chimes in via the proactive_suggestions table (max 3 per context).
+# Delivery goes through Alex, not directly to Eunos.
+background_mode: true
+
+system_prompt_file: "agents/scout/CLAUDE.md"
+
+tools:
+  - web_search
+  - bash
+  - read
+
+# Scout scans every 15 minutes
+schedule_interval: 900
