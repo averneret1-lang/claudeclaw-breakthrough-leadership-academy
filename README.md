@@ -1,6 +1,6 @@
 # Breakthrough Leadership Transformation Academy — AI Operating System
 
-Powered by [ClaudeClaw](https://github.com/alexverneret/claudeclaw). A 12-agent AI system built for BLTA to automate operations, finance, marketing, facilitation, participant engagement, and knowledge management.
+Powered by [ClaudeClaw](https://github.com/averneret1-lang/claudeclaw-breakthrough-leadership-academy). A 12-agent AI system built for BLTA to automate operations, finance, marketing, facilitation, participant engagement, and knowledge management.
 
 ---
 
@@ -33,8 +33,7 @@ Powered by [ClaudeClaw](https://github.com/alexverneret/claudeclaw). A 12-agent 
 ## Prerequisites
 
 - macOS 12+ or Ubuntu 20+
-- Node.js 20+
-- Git
+- Node.js 20+ — [nodejs.org](https://nodejs.org)
 - An Anthropic API key — [console.anthropic.com](https://console.anthropic.com)
 - 12 Telegram bots — create each via [@BotFather](https://t.me/BotFather)
 - Your Telegram user ID — get it from [@userinfobot](https://t.me/userinfobot)
@@ -44,29 +43,38 @@ Powered by [ClaudeClaw](https://github.com/alexverneret/claudeclaw). A 12-agent 
 
 ## Installation
 
-### 1. Clone this repo
+### Option A — Download ZIP (no GitHub account needed)
+
+1. [Download the ZIP](https://github.com/averneret1-lang/claudeclaw-breakthrough-leadership-academy/archive/refs/heads/main.zip)
+2. Extract it — you'll get a folder called `claudeclaw-breakthrough-leadership-academy-main`
+3. Open Terminal, navigate into the folder:
+   ```bash
+   cd ~/Downloads/claudeclaw-breakthrough-leadership-academy-main
+   ```
+4. Run the installer:
+   ```bash
+   chmod +x scripts/install.sh
+   ./scripts/install.sh
+   ```
+
+### Option B — Clone with Git
 
 ```bash
-git clone https://github.com/alexverneret/claudeclaw-breakthrough-leadership-academy.git
+git clone https://github.com/averneret1-lang/claudeclaw-breakthrough-leadership-academy.git
 cd claudeclaw-breakthrough-leadership-academy
-```
-
-### 2. Run the installer
-
-```bash
 chmod +x scripts/install.sh
 ./scripts/install.sh
 ```
 
-The installer will:
-- Verify all prerequisites are installed
-- Copy `.env.example` to `.env` and prompt for your Anthropic API key
-- Walk you through entering each agent's Telegram bot token
-- Copy all `agent.yaml.example` files to `agent.yaml`
-- Run `npm install` and build the project
-- Register all 12 agents as background services
+### What the installer does
 
-### 3. Verify agents are running
+- Prompts for your Anthropic API key
+- Walks you through entering each agent's Telegram bot token
+- Copies all `agent.yaml.example` files to `agent.yaml`
+- Runs `npm install` and builds the project
+- Registers all 12 agents as background services (macOS only)
+
+### Verify agents are running
 
 ```bash
 npm run status
