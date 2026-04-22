@@ -4,13 +4,17 @@ set -e
 AGENTS=(alex guernsy anne-christie angie facilitator daniel participant-intel fulfillment-coach alumni analytics legal librarian)
 AGENT_NAMES=("Alex (Orchestrator)" "Guernsy (Operations)" "Anne Christie (Finance)" "Angie (Marketing)" "Facilitator (Eunos & Saurel)" "Daniel (Developer)" "Participant Intel" "Fulfillment Coach" "Alumni" "Analytics" "Legal" "Librarian")
 
+BLTA_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+FRAMEWORK_DIR="$HOME/claudeclaw-blta"
+
 echo ""
 echo "================================================"
 echo "  BLTA AI Operating System — Installer"
 echo "================================================"
 echo ""
 
-# Check prerequisites
+# ─── Prerequisites ────────────────────────────────────────────────────────────
+
 echo "Checking prerequisites..."
 
 if ! command -v node &>/dev/null; then
@@ -24,28 +28,84 @@ if [ "$NODE_VER" -lt 20 ]; then
   exit 1
 fi
 
-if ! command -v git &>/dev/null; then
-  echo "Note: git not found — that's OK if you downloaded via ZIP."
-fi
-
 echo "Prerequisites OK."
 echo ""
 
-# ─── Anthropic auth (OAuth) ───────────────────────────────────────────────────
+# ─── ClaudeClaw base framework ────────────────────────────────────────────────
+
+echo "Setting up ClaudeClaw framework..."
+
+if [ -d "$FRAMEWORK_DIR/.git" ]; then
+  echo "Updating existing framework..."
+  git -C "$FRAMEWORK_DIR" pull --ff-only 2>/dev/null || echo "Could not auto-update — continuing with existing version."
+elif [ -f "$FRAMEWORK_DIR/package.json" ]; then
+  echo "Framework already present at $FRAMEWORK_DIR"
+else
+  if command -v git &>/dev/null; then
+    echo "Cloning ClaudeClaw framework..."
+    git clone https://github.com/earlyaidopters/claudeclaw.git "$FRAMEWORK_DIR"
+  else
+    echo "Downloading ClaudeClaw framework — please wait..."
+    mkdir -p "$FRAMEWORK_DIR"
+    curl -L --retry 3 --retry-delay 5 \
+      "https://github.com/earlyaidopters/claudeclaw/archive/refs/heads/main.zip" \
+      -o /tmp/claudeclaw-base.zip
+    unzip -q /tmp/claudeclaw-base.zip -d /tmp/claudeclaw-extract/
+    cp -r /tmp/claudeclaw-extract/claudeclaw-main/. "$FRAMEWORK_DIR/"
+    rm -rf /tmp/claudeclaw-base.zip /tmp/claudeclaw-extract
+  fi
+fi
+
+echo "Framework ready at $FRAMEWORK_DIR"
+echo ""
+
+# ─── Overlay BLTA agent configs ───────────────────────────────────────────────
+
+echo "Applying BLTA configuration..."
+
+# Agent folders
+for src_agent in "$BLTA_DIR/agents"/*/; do
+  [ -d "$src_agent" ] || continue
+  agent_name=$(basename "$src_agent")
+  mkdir -p "$FRAMEWORK_DIR/agents/$agent_name"
+  cp -r "$src_agent". "$FRAMEWORK_DIR/agents/$agent_name/"
+done
+
+# Launchd plists
+if [ -d "$BLTA_DIR/launchd" ]; then
+  mkdir -p "$FRAMEWORK_DIR/launchd"
+  cp "$BLTA_DIR/launchd/"*.plist "$FRAMEWORK_DIR/launchd/" 2>/dev/null || true
+fi
+
+# Extra migrations (don't overwrite existing)
+if [ -d "$BLTA_DIR/migrations" ]; then
+  mkdir -p "$FRAMEWORK_DIR/migrations"
+  for f in "$BLTA_DIR/migrations/"*.sql; do
+    [ -f "$f" ] || continue
+    fname=$(basename "$f")
+    [ -f "$FRAMEWORK_DIR/migrations/$fname" ] || cp "$f" "$FRAMEWORK_DIR/migrations/"
+  done
+fi
+
+# .env.example
+[ -f "$BLTA_DIR/.env.example" ] && cp "$BLTA_DIR/.env.example" "$FRAMEWORK_DIR/.env.example"
+
+echo "BLTA configuration applied."
+echo ""
+
+# Work from framework directory for the rest of setup
+cd "$FRAMEWORK_DIR"
 
 if [ ! -f .env ]; then
-  cp .env.example .env
+  cp .env.example .env 2>/dev/null || touch .env
 fi
+
+# ─── Anthropic auth (OAuth) ───────────────────────────────────────────────────
 
 echo "Setting up Anthropic authentication..."
 echo ""
 
-# Try OAuth via claude CLI, fall back to API key if install fails
-USING_OAUTH=false
-
-if command -v claude &>/dev/null; then
-  echo "Claude CLI already installed."
-else
+if ! command -v claude &>/dev/null; then
   echo "Installing Claude CLI (~200MB — please wait, do not close this window)..."
   mkdir -p "$HOME/.npm-global"
   npm config set prefix "$HOME/.npm-global"
@@ -65,7 +125,6 @@ fi
 if claude auth status &>/dev/null 2>&1; then
   echo "Already logged in to Anthropic."
 else
-  echo ""
   echo "A browser window will open — sign in with your Anthropic account."
   echo "If no browser opens, copy and paste the URL that appears below."
   echo ""
@@ -73,14 +132,14 @@ else
 fi
 
 echo "Anthropic auth complete."
-
 echo ""
 
-echo ""
+# ─── Telegram bots ────────────────────────────────────────────────────────────
+
 echo "Now configure each agent. You need one Telegram bot token per agent."
-echo "Create bots at https://t.me/BotFather"
+echo "Create bots at https://t.me/BotFather — send /newbot for each one."
 echo ""
-echo "Enter your Telegram user ID (same for all agents unless specified):"
+echo "Enter your Telegram user ID (get it from https://t.me/userinfobot):"
 read -r DEFAULT_USER_ID
 
 for i in "${!AGENTS[@]}"; do
@@ -109,6 +168,8 @@ for i in "${!AGENTS[@]}"; do
   rm -f "agents/${agent}/agent.yaml.bak"
   echo "${name} configured."
 done
+
+# ─── Install & build ──────────────────────────────────────────────────────────
 
 echo ""
 echo "Installing dependencies..."
@@ -156,14 +217,13 @@ fi
 echo ""
 echo "================================================"
 echo "  Installation complete."
+echo "  System installed at: $FRAMEWORK_DIR"
 echo "  All 12 agents configured."
 echo ""
 echo "  Start all agents:"
-echo "    npm run start:all"
+echo "    cd $FRAMEWORK_DIR && npm run start:all"
 echo ""
 echo "  Check status:"
-echo "    npm run status"
+echo "    cd $FRAMEWORK_DIR && npm run status"
 echo "================================================"
 echo ""
-
-
