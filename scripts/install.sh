@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 set -e
 
-AGENTS=(alex guernsy anne-christie angie facilitator daniel participant-intel fulfillment-coach alumni analytics legal librarian)
-AGENT_NAMES=("Alex (Orchestrator)" "Guernsy (Operations)" "Anne Christie (Finance)" "Angie (Marketing)" "Facilitator (Eunos & Saurel)" "Daniel (Developer)" "Participant Intel" "Fulfillment Coach" "Alumni" "Analytics" "Legal" "Librarian")
+AGENTS=(alex guernsy anne-christie angie facilitator daniel participant-intel fulfillment-coach alumni analytics legal librarian scout)
+AGENT_NAMES=("Alex (Orchestrator)" "Guernsy (Operations)" "Anne Christie (Finance)" "Angie (Marketing)" "Facilitator (Eunos & Saurel)" "Daniel (Developer)" "Participant Intel" "Fulfillment Coach" "Alumni" "Analytics" "Legal" "Librarian" "Scout (Research — background only)")
 
 BLTA_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FRAMEWORK_DIR="$HOME/claudeclaw-blta"
 
 echo ""
 echo "================================================"
-echo "  BLTA AI Operating System — Installer"
+echo "  Breakthrough Leadership Transformation Academy"
+echo "  AI Operating System — Installer"
 echo "================================================"
 echo ""
 
@@ -90,6 +91,19 @@ fi
 # .env.example
 [ -f "$BLTA_DIR/.env.example" ] && cp "$BLTA_DIR/.env.example" "$FRAMEWORK_DIR/.env.example"
 
+# BLTA custom scripts (overlay onto framework scripts/)
+if [ -d "$BLTA_DIR/scripts" ]; then
+  mkdir -p "$FRAMEWORK_DIR/scripts"
+  for f in "$BLTA_DIR/scripts/"*.sh "$BLTA_DIR/scripts/"*.py; do
+    [ -f "$f" ] || continue
+    fname=$(basename "$f")
+    # Don't overwrite install.sh itself
+    [ "$fname" = "install.sh" ] && continue
+    cp "$f" "$FRAMEWORK_DIR/scripts/$fname"
+    chmod +x "$FRAMEWORK_DIR/scripts/$fname"
+  done
+fi
+
 echo "BLTA configuration applied."
 echo ""
 
@@ -148,10 +162,21 @@ for i in "${!AGENTS[@]}"; do
 
   echo ""
   echo "--- ${name} ---"
+
+  cp "agents/${agent}/agent.yaml.example" "agents/${agent}/agent.yaml"
+
+  # Scout runs in background — no Telegram bot needed
+  if [ "$agent" = "scout" ]; then
+    sed -i.bak "s|YOUR_TELEGRAM_BOT_TOKEN_HERE|background-only|g" "agents/${agent}/agent.yaml"
+    sed -i.bak "s|YOUR_TELEGRAM_USER_ID_HERE|$DEFAULT_USER_ID|g" "agents/${agent}/agent.yaml"
+    echo "Scout configured (background research agent — no bot token needed)."
+    rm -f "agents/${agent}/agent.yaml.bak"
+    continue
+  fi
+
   echo "Telegram bot token for ${name}:"
   read -r TOKEN
 
-  cp "agents/${agent}/agent.yaml.example" "agents/${agent}/agent.yaml"
   sed -i.bak "s|YOUR_TELEGRAM_BOT_TOKEN_HERE|$TOKEN|g" "agents/${agent}/agent.yaml"
 
   if [ "$agent" = "facilitator" ]; then
@@ -218,7 +243,7 @@ echo ""
 echo "================================================"
 echo "  Installation complete."
 echo "  System installed at: $FRAMEWORK_DIR"
-echo "  All 12 agents configured."
+echo "  All 13 agents configured (including Scout research agent)."
 echo ""
 echo "  Start all agents:"
 echo "    cd $FRAMEWORK_DIR && npm run start:all"
