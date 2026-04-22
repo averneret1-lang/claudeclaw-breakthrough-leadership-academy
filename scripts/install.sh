@@ -44,43 +44,35 @@ echo ""
 USING_OAUTH=false
 
 if command -v claude &>/dev/null; then
-  USING_OAUTH=true
+  echo "Claude CLI already installed."
 else
-  echo "Installing Claude CLI (this may take a minute)..."
+  echo "Installing Claude CLI (~200MB — please wait, do not close this window)..."
   mkdir -p "$HOME/.npm-global"
   npm config set prefix "$HOME/.npm-global"
-  if npm install -g @anthropic-ai/claude-code 2>/dev/null; then
-    export PATH="$HOME/.npm-global/bin:$PATH"
-    PROFILE="$HOME/.zshrc"
-    [ -f "$HOME/.bash_profile" ] && PROFILE="$HOME/.bash_profile"
-    grep -q '.npm-global/bin' "$PROFILE" 2>/dev/null || \
-      echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> "$PROFILE"
-    USING_OAUTH=true
-    echo "Claude CLI installed."
-  else
-    echo "CLI install skipped (network issue) — using API key instead."
-  fi
+  npm install -g @anthropic-ai/claude-code \
+    --fetch-timeout 600000 \
+    --fetch-retry 5 \
+    --fetch-retry-mintimeout 20000 \
+    --fetch-retry-maxtimeout 120000
+  export PATH="$HOME/.npm-global/bin:$PATH"
+  PROFILE="$HOME/.zshrc"
+  [ -f "$HOME/.bash_profile" ] && PROFILE="$HOME/.bash_profile"
+  grep -q '.npm-global/bin' "$PROFILE" 2>/dev/null || \
+    echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> "$PROFILE"
+  echo "Claude CLI installed."
 fi
 
-if [ "$USING_OAUTH" = "true" ]; then
-  if claude auth status &>/dev/null 2>&1; then
-    echo "Already logged in to Anthropic."
-  else
-    echo "A browser window will open — sign in with your Anthropic account."
-    echo "If no browser opens, follow the URL printed below."
-    echo ""
-    claude auth login
-  fi
-  echo "Anthropic auth complete."
+if claude auth status &>/dev/null 2>&1; then
+  echo "Already logged in to Anthropic."
 else
   echo ""
-  echo "Get your API key at: https://console.anthropic.com/settings/keys"
-  echo "Enter your Anthropic API key:"
-  read -r ANTHROPIC_KEY
-  sed -i.bak "s|.*ANTHROPIC_API_KEY.*|ANTHROPIC_API_KEY=$ANTHROPIC_KEY|" .env
-  rm -f .env.bak
-  echo "API key saved."
+  echo "A browser window will open — sign in with your Anthropic account."
+  echo "If no browser opens, copy and paste the URL that appears below."
+  echo ""
+  claude auth login
 fi
+
+echo "Anthropic auth complete."
 
 echo ""
 
