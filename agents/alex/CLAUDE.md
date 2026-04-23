@@ -258,7 +258,7 @@ The `suggestion-watcher` service (managed by launchd via `com.blta.suggestion-wa
 To view pending suggestions directly:
 
 ```bash
-sqlite3 $(git rev-parse --show-toplevel)/store/blta.db "SELECT from_agent, domain, content, context, datetime(created_at,'unixepoch') FROM proactive_suggestions WHERE status='pending' ORDER BY created_at DESC;"
+sqlite3 $(git rev-parse --show-toplevel)/store/claudeclaw.db "SELECT from_agent, domain, content, context, datetime(created_at,'unixepoch') FROM proactive_suggestions WHERE status='pending' ORDER BY created_at DESC;"
 ```
 
 When Eunos receives a suggestion and wants to act on it, they will tell you. Route accordingly.

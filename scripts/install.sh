@@ -10,7 +10,8 @@ echo "  BLTA AI Operating System — Installer"
 echo "================================================"
 echo ""
 
-# Check prerequisites
+# ─── Prerequisites ────────────────────────────────────────────────────────────
+
 echo "Checking prerequisites..."
 
 if ! command -v node &>/dev/null; then
@@ -32,9 +33,41 @@ fi
 echo "Prerequisites OK."
 echo ""
 
-# API key
+# ─── Engine ───────────────────────────────────────────────────────────────────
+
+echo "Pulling ClaudeClaw engine..."
+if [ ! -d engine ]; then
+  git clone --depth 1 https://github.com/earlyaidopters/claudeclaw engine
+else
+  echo "  Engine directory exists. Pulling latest..."
+  cd engine && git pull --ff-only 2>/dev/null || echo "  (already up to date or skipped)" && cd ..
+fi
+
+echo "Installing engine dependencies..."
+cd engine
+npm install --legacy-peer-deps --timeout=120000
+echo "Building engine..."
+npm run build
+cd ..
+
+echo "Engine ready."
+echo ""
+
+# ─── Environment ──────────────────────────────────────────────────────────────
+
 if [ ! -f .env ]; then
   cp .env.example .env
+fi
+
+PROJECT_DIR=$(pwd)
+
+# Write CLAUDECLAW_CONFIG so the engine finds this repo's agents/
+if grep -q "^CLAUDECLAW_CONFIG" .env 2>/dev/null; then
+  sed -i.bak "s|^CLAUDECLAW_CONFIG=.*|CLAUDECLAW_CONFIG=$PROJECT_DIR|" .env && rm -f .env.bak
+elif grep -q "CLAUDECLAW_CONFIG" .env 2>/dev/null; then
+  sed -i.bak "s|.*CLAUDECLAW_CONFIG.*|CLAUDECLAW_CONFIG=$PROJECT_DIR|" .env && rm -f .env.bak
+else
+  echo "CLAUDECLAW_CONFIG=$PROJECT_DIR" >> .env
 fi
 
 echo "Enter your Anthropic API key:"
@@ -73,15 +106,8 @@ for i in "${!AGENTS[@]}"; do
   fi
 
   rm -f "agents/${agent}/agent.yaml.bak"
-  echo "${name} configured."
+  echo "  ${name} configured."
 done
-
-echo ""
-echo "Installing dependencies..."
-npm install
-
-echo "Building project..."
-npm run build
 
 # ─── Database ─────────────────────────────────────────────────────────────────
 
@@ -104,19 +130,73 @@ fi
 
 # ─── Launchd (macOS) ──────────────────────────────────────────────────────────
 
-OS=$(uname)
-if [ "$OS" = "Darwin" ] && [ -d launchd ]; then
+if [ "$(uname)" = "Darwin" ]; then
   echo ""
   echo "Registering background services (macOS)..."
   mkdir -p "$HOME/Library/Logs/blta"
-  for plist in launchd/*.plist; do
-    [ -f "$plist" ] || continue
-    DEST="$HOME/Library/LaunchAgents/$(basename $plist)"
-    sed "s|__PROJECT_DIR__|$(pwd)|g; s|__HOME__|$HOME|g" "$plist" > "$DEST"
+
+  # Per-agent launchd plists (generated dynamically)
+  for agent in "${AGENTS[@]}"; do
+    LABEL="com.blta.$agent"
+    DEST="$HOME/Library/LaunchAgents/$LABEL.plist"
+
+    cat > "$DEST" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>$LABEL</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>$PROJECT_DIR/engine/dist/index.js</string>
+    <string>--agent</string>
+    <string>$agent</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>$PROJECT_DIR</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HOME</key>
+    <string>$HOME</string>
+    <key>CLAUDECLAW_CONFIG</key>
+    <string>$PROJECT_DIR</string>
+    <key>CLAUDECLAW_AGENT_ID</key>
+    <string>$agent</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+  <key>StandardOutPath</key>
+  <string>$HOME/Library/Logs/blta/$agent.log</string>
+  <key>StandardErrorPath</key>
+  <string>$HOME/Library/Logs/blta/$agent.log</string>
+</dict>
+</plist>
+PLIST
+
     launchctl unload "$DEST" 2>/dev/null || true
     launchctl load "$DEST" 2>/dev/null || true
-    echo "  Loaded $(basename $plist)"
+    echo "  Loaded $LABEL"
   done
+
+  # Static plists (suggestion-watcher, etc.)
+  if [ -d launchd ]; then
+    for plist in launchd/*.plist; do
+      [ -f "$plist" ] || continue
+      DEST="$HOME/Library/LaunchAgents/$(basename $plist)"
+      sed "s|__PROJECT_DIR__|$PROJECT_DIR|g; s|__HOME__|$HOME|g" "$plist" > "$DEST"
+      launchctl unload "$DEST" 2>/dev/null || true
+      launchctl load "$DEST" 2>/dev/null || true
+      echo "  Loaded $(basename $plist)"
+    done
+  fi
 fi
 
 echo ""
@@ -124,10 +204,16 @@ echo "================================================"
 echo "  Installation complete."
 echo "  All 12 agents configured."
 echo ""
-echo "  Start all agents:"
-echo "    npm run start:all"
+echo "  Check agent status:"
+echo "    launchctl list | grep com.blta"
 echo ""
-echo "  Check status:"
-echo "    npm run status"
+echo "  View agent logs:"
+echo "    tail -f ~/Library/Logs/blta/alex.log"
+echo ""
+echo "  Restart a specific agent:"
+echo "    launchctl kickstart -k gui/\$(id -u)/com.blta.alex"
+echo ""
+echo "  Stop all agents:"
+echo "    for s in \$(launchctl list | grep com.blta | awk '{print \$3}'); do launchctl unload ~/Library/LaunchAgents/\$s.plist; done"
 echo "================================================"
 echo ""
