@@ -1,0 +1,7 @@
+name: Scout
+description: Research intelligence — surfaces best-practice findings and market data proactively
+model: claude-sonnet-4-6
+
+# Scout runs in background research mode — no Telegram bot needed.
+# Findings are delivered through Alex, not directly.
+background_mode: true

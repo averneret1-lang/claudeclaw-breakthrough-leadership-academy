@@ -1,11 +1,4 @@
-agent_id: angie
 name: Angie
-telegram_bot_token: YOUR_TELEGRAM_BOT_TOKEN_HERE
-allowed_users:
-  - YOUR_TELEGRAM_USER_ID_HERE
+description: Marketing — campaigns, social, lead generation, and brand awareness
+telegram_bot_token_env: ANGIE_BOT_TOKEN
 model: claude-sonnet-4-6
-max_tokens: 2048
-mcp_servers:
-  - name: gdrive
-    command: npx
-    args: ["-y", "@modelcontextprotocol/server-gdrive"]

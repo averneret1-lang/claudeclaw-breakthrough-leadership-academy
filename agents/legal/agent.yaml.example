@@ -1,11 +1,4 @@
-agent_id: legal
 name: Legal
-telegram_bot_token: YOUR_TELEGRAM_BOT_TOKEN_HERE
-allowed_users:
-  - YOUR_TELEGRAM_USER_ID_HERE
+description: Legal and compliance — contracts, waivers, policies, multi-jurisdictional review
+telegram_bot_token_env: LEGAL_BOT_TOKEN
 model: claude-sonnet-4-6
-max_tokens: 4096
-mcp_servers:
-  - name: gdrive
-    command: npx
-    args: ["-y", "@modelcontextprotocol/server-gdrive"]

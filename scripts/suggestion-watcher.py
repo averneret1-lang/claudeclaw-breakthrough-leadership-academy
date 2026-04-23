@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 suggestion-watcher.py — BLTA AI Operating System
-Delivers proactive agent suggestions to Eunos via Alex's Telegram bot.
+Batches all pending agent chimes and delivers them to Eunos via Alex's Telegram bot.
+Alex presents them as a single synthesized briefing — not individual agent pings.
 Runs every 2 minutes via launchd (called by suggestion-watcher.sh).
 """
 import os, sqlite3, subprocess, re, time, html
@@ -23,12 +24,13 @@ AGENT_DISPLAY = {
     'analytics':         'Analytics',
     'legal':             'Legal',
     'librarian':         'Librarian',
+    'scout':             'Scout (Research)',
 }
 
 def display(agent_id: str) -> str:
     return AGENT_DISPLAY.get((agent_id or '').lower(), (agent_id or 'Agent').capitalize())
 
-def clean(text: str, limit: int = 500) -> str:
+def clean(text: str, limit: int = 400) -> str:
     text = re.sub(r'<[^>]+>', '', text)
     text = html.unescape(text).strip()
     if len(text) > limit:
@@ -58,45 +60,78 @@ def main():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     now = int(time.time())
-    delivered = 0
 
     try:
         rows = conn.execute("""
-            SELECT id, from_agent, domain, content, context
+            SELECT id, from_agent, domain, content, context,
+                   COALESCE(context_key, context, 'general') as context_key,
+                   COALESCE(chime_seq, 1) as chime_seq
             FROM proactive_suggestions
             WHERE status = 'pending'
             ORDER BY created_at ASC
-            LIMIT 10
+            LIMIT 15
         """).fetchall()
 
+        if not rows:
+            print('No new suggestions.', flush=True)
+            return
+
+        # Build a single batched message from Alex's perspective
+        lines = ["<b>Alex:</b> Here's what the team is flagging:\n"]
+
+        valid_rows = []
         for row in rows:
-            agent   = row['from_agent']
             content = (row['content'] or '').strip()
-            context = (row['context'] or '').strip()
             if not content:
                 continue
 
+            agent    = row['from_agent']
+            context  = (row['context'] or '').strip()
+            seq      = row['chime_seq'] or 1
             name     = display(agent)
             body     = clean(content)
-            ctx_line = f"\n<i>re: {context}</i>" if context else ''
-            msg      = f"💡 <b>{name}:</b>{ctx_line}\n\n{body}"
+            ctx_line = f" <i>re: {context}</i>" if context else ''
+            seq_note = f" [{seq}/3]"
 
-            if send_telegram(msg):
-                conn.execute(
-                    "UPDATE proactive_suggestions SET status='delivered', delivered_at=? WHERE id=?",
-                    (now, row['id'])
-                )
-                conn.commit()
-                delivered += 1
-                print(f"Delivered suggestion from {agent}", flush=True)
+            lines.append(f"• <b>{name}{seq_note}:</b>{ctx_line}\n{body}\n")
+            valid_rows.append(row)
+
+        if not valid_rows:
+            print('No valid suggestions to deliver.', flush=True)
+            return
+
+        # Check if any agent hit the 3-chime cap
+        try:
+            capped = conn.execute("""
+                SELECT agent_id, context_key
+                FROM agent_chime_state
+                WHERE paused = 1
+            """).fetchall()
+
+            if capped:
+                cap_names = ', '.join(display(r['agent_id']) for r in capped)
+                lines.append(f"\n<i>{cap_names} hit the 3-chime limit. Tell me if you want them to keep going.</i>")
+        except Exception:
+            pass  # table may not exist yet if migration hasn't run
+
+        msg = '\n'.join(lines)
+
+        if send_telegram(msg):
+            ids = [row['id'] for row in valid_rows]
+            placeholders = ','.join('?' for _ in ids)
+            conn.execute(
+                f"UPDATE proactive_suggestions SET status='delivered', delivered_at=? WHERE id IN ({placeholders})",
+                [now] + ids
+            )
+            conn.commit()
+            print(f"Delivered {len(valid_rows)} suggestion(s) in one Alex briefing.", flush=True)
+        else:
+            print("Failed to send Telegram message.", flush=True)
 
     except Exception as e:
         print(f"Error: {e}", flush=True)
     finally:
         conn.close()
-
-    if delivered == 0:
-        print('No new suggestions.', flush=True)
 
 if __name__ == '__main__':
     main()
