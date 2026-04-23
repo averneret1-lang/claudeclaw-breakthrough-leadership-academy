@@ -200,6 +200,14 @@ echo ""
 echo "Installing dependencies..."
 npm install
 
+echo "Installing missing type declarations..."
+npm install --save-dev \
+  @types/js-yaml@^4.0.9 \
+  @types/better-sqlite3@^7.6.12 \
+  @types/qrcode-terminal@^0.12.2 \
+  vitest@^2.0.0 \
+  2>/dev/null || true
+
 echo "Building project..."
 npm run build
 
