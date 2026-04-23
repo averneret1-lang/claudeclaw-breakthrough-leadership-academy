@@ -112,6 +112,7 @@ cd "$FRAMEWORK_DIR"
 
 if [ ! -f .env ]; then
   cp .env.example .env 2>/dev/null || touch .env
+  chmod 600 .env
 fi
 
 # ─── Anthropic auth (OAuth) ───────────────────────────────────────────────────
@@ -265,17 +266,70 @@ fi
 # ─── Launchd (macOS) ──────────────────────────────────────────────────────────
 
 OS=$(uname)
-if [ "$OS" = "Darwin" ] && [ -d launchd ]; then
+if [ "$OS" = "Darwin" ]; then
   echo ""
   echo "Registering background services (macOS)..."
   mkdir -p "$HOME/Library/Logs/blta"
-  for plist in launchd/*.plist; do
-    [ -f "$plist" ] || continue
-    DEST="$HOME/Library/LaunchAgents/$(basename $plist)"
-    sed "s|__PROJECT_DIR__|$(pwd)|g; s|__HOME__|$HOME|g" "$plist" > "$DEST"
+  mkdir -p "$(pwd)/logs"
+
+  PROJECT_DIR="$(pwd)"
+  NODE_BIN="/opt/homebrew/bin/node"
+  [ -f "$NODE_BIN" ] || NODE_BIN="$(which node)"
+
+  # Remove any stale engine plists from LaunchAgents (main/comms/content/ops/research
+  # are engine defaults — BLTA does not use them)
+  for stale in main comms content ops research; do
+    STALE_DEST="$HOME/Library/LaunchAgents/com.claudeclaw.${stale}.plist"
+    launchctl unload "$STALE_DEST" 2>/dev/null || true
+    rm -f "$STALE_DEST"
+  done
+
+  # Generate and load a plist for each BLTA agent
+  BLTA_AGENTS=(alex guernsy anne-christie angie facilitator daniel participant-intel fulfillment-coach alumni analytics legal librarian)
+  for agent in "${BLTA_AGENTS[@]}"; do
+    LABEL="com.blta.agent.${agent}"
+    DEST="$HOME/Library/LaunchAgents/${LABEL}.plist"
+    cat > "$DEST" << PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>${LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${NODE_BIN}</string>
+    <string>${PROJECT_DIR}/dist/index.js</string>
+    <string>--agent</string>
+    <string>${agent}</string>
+  </array>
+  <key>WorkingDirectory</key><string>${PROJECT_DIR}</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key><string>${HOME}</string>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>NODE_ENV</key><string>production</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>30</integer>
+  <key>StandardOutPath</key><string>${PROJECT_DIR}/logs/${agent}.log</string>
+  <key>StandardErrorPath</key><string>${PROJECT_DIR}/logs/${agent}.log</string>
+</dict>
+</plist>
+PLIST
     launchctl unload "$DEST" 2>/dev/null || true
     launchctl load "$DEST" 2>/dev/null || true
-    echo "  Loaded $(basename $plist)"
+    echo "  Loaded agent: $agent"
+  done
+
+  # Load BLTA helper plists (scout, suggestion-watcher) from repo
+  for plist in launchd/com.blta.*.plist; do
+    [ -f "$plist" ] || continue
+    DEST="$HOME/Library/LaunchAgents/$(basename $plist)"
+    sed "s|__PROJECT_DIR__|${PROJECT_DIR}|g; s|__HOME__|${HOME}|g" "$plist" > "$DEST"
+    launchctl unload "$DEST" 2>/dev/null || true
+    launchctl load "$DEST" 2>/dev/null || true
+    echo "  Loaded helper: $(basename $plist)"
   done
 fi
 
@@ -283,15 +337,15 @@ FINAL_TOKEN=$(grep "^DASHBOARD_TOKEN=" .env | cut -d'=' -f2)
 echo ""
 echo "================================================"
 echo "  Installation complete."
-echo "  System installed at: $FRAMEWORK_DIR"
-echo "  All 13 agents configured (including Scout research agent)."
+echo "  System installed at: $(pwd)"
+echo "  12 agents running + Scout (background research)."
 echo ""
-echo "  Agents are running via launchd (start on login automatically)."
+echo "  Agents start automatically on login via launchd."
 echo ""
 echo "  Mission Control Dashboard:"
 echo "    http://localhost:3141/dashboard?token=$FINAL_TOKEN"
 echo ""
 echo "  Check agent status:"
-echo "    launchctl list | grep claudeclaw"
+echo "    launchctl list | grep com.blta.agent"
 echo "================================================"
 echo ""

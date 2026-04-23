@@ -5,19 +5,19 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DB="$PROJECT_ROOT/store/claudeclaw.db"
-AGENT_YAML="$PROJECT_ROOT/agents/alex/agent.yaml"
+ENV_FILE="$PROJECT_ROOT/.env"
 
-if [ ! -f "$AGENT_YAML" ]; then
-  echo "suggestion-watcher: agents/alex/agent.yaml not found — run install.sh first" >&2
+if [ ! -f "$ENV_FILE" ]; then
+  echo "suggestion-watcher: .env not found — run install.sh first" >&2
   exit 1
 fi
 
-# Read token and allowed_users from Alex's agent.yaml
-TOKEN=$(grep 'telegram_bot_token:' "$AGENT_YAML" | awk '{print $2}' | tr -d '"' | tr -d "'")
-CHAT_ID=$(grep -A2 'allowed_users:' "$AGENT_YAML" | grep '  - ' | head -1 | awk '{print $2}' | tr -d '"' | tr -d "'")
+# Read token and admin chat ID from .env (tokens live there, not in agent.yaml)
+TOKEN=$(grep '^ALEX_BOT_TOKEN=' "$ENV_FILE" | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+CHAT_ID=$(grep '^ADMIN_TELEGRAM_ID=' "$ENV_FILE" | cut -d'=' -f2 | tr -d '"' | tr -d "'")
 
-if [ -z "$TOKEN" ] || [ -z "$CHAT_ID" ] || [ "$TOKEN" = "YOUR_TELEGRAM_BOT_TOKEN_HERE" ]; then
-  echo "suggestion-watcher: Alex agent not configured yet — run install.sh" >&2
+if [ -z "$TOKEN" ] || [ -z "$CHAT_ID" ]; then
+  echo "suggestion-watcher: ALEX_BOT_TOKEN or ADMIN_TELEGRAM_ID not set in .env — run install.sh" >&2
   exit 0
 fi
 
