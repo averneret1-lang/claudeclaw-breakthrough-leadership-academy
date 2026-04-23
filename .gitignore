@@ -1,0 +1,31 @@
+# ─── Secrets & credentials ─────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── Live agent configs (contain Telegram tokens + user IDs) ───────────────
+agents/*/agent.yaml
+!agents/*/agent.yaml.example
+
+# ─── Database ───────────────────────────────────────────────────────────────
+store/
+*.db
+*.db-wal
+*.db-shm
+
+# ─── Engine (cloned at install time — not committed) ────────────────────────
+engine/
+
+# ─── Logs ───────────────────────────────────────────────────────────────────
+logs/
+*.log
+
+# ─── macOS ──────────────────────────────────────────────────────────────────
+.DS_Store
+
+# ─── Node ───────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+
+# ─── Backups created by sed -i.bak ──────────────────────────────────────────
+*.bak

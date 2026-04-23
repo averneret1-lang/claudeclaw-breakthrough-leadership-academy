@@ -30,6 +30,15 @@ if ! command -v git &>/dev/null; then
   exit 1
 fi
 
+# FIX: check for python3 — required by suggestion-watcher
+if ! command -v python3 &>/dev/null; then
+  echo "ERROR: python3 not found. Install via: brew install python3"
+  exit 1
+fi
+
+# FIX: detect node binary path dynamically (works on Intel + Apple Silicon)
+NODE_BIN="$(which node)"
+
 echo "Prerequisites OK."
 echo ""
 
@@ -40,7 +49,10 @@ if [ ! -d engine ]; then
   git clone --depth 1 https://github.com/earlyaidopters/claudeclaw engine
 else
   echo "  Engine directory exists. Pulling latest..."
-  cd engine && git pull --ff-only 2>/dev/null || echo "  (already up to date or skipped)" && cd ..
+  # FIX: run in a subshell so the cd does not affect the parent shell.
+  # Without the subshell, a successful git pull leaves us inside engine/
+  # and the subsequent unconditional `cd engine` would fail with set -e.
+  (cd engine && git pull --ff-only 2>/dev/null || echo "  (already up to date or skipped)")
 fi
 
 echo "Installing engine dependencies..."
@@ -70,44 +82,50 @@ else
   echo "CLAUDECLAW_CONFIG=$PROJECT_DIR" >> .env
 fi
 
+# FIX: auto-generate DB_ENCRYPTION_KEY if not already set
+EXISTING_KEY=$(grep "^DB_ENCRYPTION_KEY=" .env 2>/dev/null | cut -d'=' -f2 | tr -d '"')
+if [ -z "$EXISTING_KEY" ]; then
+  DB_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+  if grep -q "^DB_ENCRYPTION_KEY" .env 2>/dev/null; then
+    sed -i.bak "s|^DB_ENCRYPTION_KEY=.*|DB_ENCRYPTION_KEY=$DB_KEY|" .env && rm -f .env.bak
+  elif grep -q "DB_ENCRYPTION_KEY" .env 2>/dev/null; then
+    sed -i.bak "s|.*DB_ENCRYPTION_KEY.*|DB_ENCRYPTION_KEY=$DB_KEY|" .env && rm -f .env.bak
+  else
+    echo "DB_ENCRYPTION_KEY=$DB_KEY" >> .env
+  fi
+  echo "  Generated DB_ENCRYPTION_KEY."
+else
+  DB_KEY="$EXISTING_KEY"
+  echo "  DB_ENCRYPTION_KEY already set."
+fi
+
 echo "Enter your Anthropic API key:"
 read -r ANTHROPIC_KEY
 sed -i.bak "s|ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=$ANTHROPIC_KEY|" .env
 rm -f .env.bak
 
+# ─── Alex (Orchestrator) — required to start ──────────────────────────────────
 echo ""
-echo "Now configure each agent. You need one Telegram bot token per agent."
-echo "Create bots at https://t.me/BotFather"
+echo "Setting up Alex — your main orchestrator bot."
+echo "Create a bot at https://t.me/BotFather and paste the token here."
 echo ""
-echo "Enter your Telegram user ID (same for all agents unless specified):"
+echo "Alex bot token:"
+read -r ALEX_TOKEN
+
+echo "Your Telegram user ID (find it at https://t.me/userinfobot):"
 read -r DEFAULT_USER_ID
 
-for i in "${!AGENTS[@]}"; do
-  agent="${AGENTS[$i]}"
-  name="${AGENT_NAMES[$i]}"
-
-  echo ""
-  echo "--- ${name} ---"
-  echo "Telegram bot token for ${name}:"
-  read -r TOKEN
-
-  cp "agents/${agent}/agent.yaml.example" "agents/${agent}/agent.yaml"
-  sed -i.bak "s|YOUR_TELEGRAM_BOT_TOKEN_HERE|$TOKEN|g" "agents/${agent}/agent.yaml"
-
-  if [ "$agent" = "facilitator" ]; then
-    echo "Eunos's Telegram user ID:"
-    read -r EUNOS_ID
-    echo "Saurel's Telegram user ID:"
-    read -r SAUREL_ID
-    sed -i.bak "s|EUNOS_TELEGRAM_USER_ID_HERE|$EUNOS_ID|g" "agents/${agent}/agent.yaml"
-    sed -i.bak "s|SAUREL_TELEGRAM_USER_ID_HERE|$SAUREL_ID|g" "agents/${agent}/agent.yaml"
-  else
-    sed -i.bak "s|YOUR_TELEGRAM_USER_ID_HERE|$DEFAULT_USER_ID|g" "agents/${agent}/agent.yaml"
-  fi
-
-  rm -f "agents/${agent}/agent.yaml.bak"
-  echo "  ${name} configured."
-done
+cp "agents/alex/agent.yaml.example" "agents/alex/agent.yaml"
+sed -i.bak "s|YOUR_TELEGRAM_BOT_TOKEN_HERE|$ALEX_TOKEN|g" "agents/alex/agent.yaml"
+sed -i.bak "s|YOUR_TELEGRAM_USER_ID_HERE|$DEFAULT_USER_ID|g" "agents/alex/agent.yaml"
+rm -f "agents/alex/agent.yaml.bak"
+echo "  Alex configured."
+echo ""
+echo "The remaining 11 agents (Guernsy, Anne Christie, Angie, etc.) can be"
+echo "activated one-by-one after install using:"
+echo "  ./scripts/add-agent.sh            (interactive menu)"
+echo "  ./scripts/add-agent.sh guernsy    (activate a specific agent)"
+echo "  ./scripts/add-agent.sh --all      (activate all at once)"
 
 # ─── Database ─────────────────────────────────────────────────────────────────
 
@@ -135,8 +153,8 @@ if [ "$(uname)" = "Darwin" ]; then
   echo "Registering background services (macOS)..."
   mkdir -p "$HOME/Library/Logs/blta"
 
-  # Per-agent launchd plists (generated dynamically)
-  for agent in "${AGENTS[@]}"; do
+  # Boot Alex only on first install. Other agents are activated via add-agent.sh.
+  for agent in alex; do
     LABEL="com.blta.$agent"
     DEST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
@@ -149,7 +167,7 @@ if [ "$(uname)" = "Darwin" ]; then
   <string>$LABEL</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/opt/homebrew/bin/node</string>
+    <string>$NODE_BIN</string>
     <string>$PROJECT_DIR/engine/dist/index.js</string>
     <string>--agent</string>
     <string>$agent</string>
@@ -166,6 +184,12 @@ if [ "$(uname)" = "Darwin" ]; then
     <string>$PROJECT_DIR</string>
     <key>CLAUDECLAW_AGENT_ID</key>
     <string>$agent</string>
+    <key>ANTHROPIC_API_KEY</key>
+    <string>$ANTHROPIC_KEY</string>
+    <key>DB_ENCRYPTION_KEY</key>
+    <string>$DB_KEY</string>
+    <key>NODE_ENV</key>
+    <string>production</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>
@@ -202,15 +226,21 @@ fi
 echo ""
 echo "================================================"
 echo "  Installation complete."
-echo "  All 12 agents configured."
 echo ""
-echo "  Check agent status:"
+echo "  Alex is running. Message your bot on Telegram."
+echo ""
+echo "  Activate more agents when ready:"
+echo "    ./scripts/add-agent.sh            (interactive menu)"
+echo "    ./scripts/add-agent.sh guernsy    (single agent)"
+echo "    ./scripts/add-agent.sh --all      (all 11 remaining)"
+echo ""
+echo "  Check status:"
 echo "    launchctl list | grep com.blta"
 echo ""
-echo "  View agent logs:"
+echo "  View logs:"
 echo "    tail -f ~/Library/Logs/blta/alex.log"
 echo ""
-echo "  Restart a specific agent:"
+echo "  Restart an agent:"
 echo "    launchctl kickstart -k gui/\$(id -u)/com.blta.alex"
 echo ""
 echo "  Stop all agents:"
