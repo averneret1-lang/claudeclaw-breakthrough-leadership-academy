@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -e
 
-AGENTS=(alex guernsy anne-christie angie facilitator daniel participant-intel fulfillment-coach alumni analytics legal librarian scout)
-AGENT_NAMES=("Alex (Orchestrator)" "Guernsy (Operations)" "Anne Christie (Finance)" "Angie (Marketing)" "Facilitator (Eunos & Saurel)" "Daniel (Developer)" "Participant Intel" "Fulfillment Coach" "Alumni" "Analytics" "Legal" "Librarian" "Scout (Research — background only)")
-
 BLTA_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FRAMEWORK_DIR="$HOME/claudeclaw-blta"
 
@@ -173,12 +170,10 @@ echo "Alex orchestrator bot token (from @BotFather):"
 read -r ALEX_TOKEN
 set_env "ALEX_BOT_TOKEN" "$ALEX_TOKEN"
 
-# Copy all agent yaml templates (no tokens needed for others yet)
-for agent in "${AGENTS[@]}"; do
-  cp "agents/${agent}/agent.yaml.example" "agents/${agent}/agent.yaml" 2>/dev/null || true
-done
+# Only activate the primary orchestrator — others are added via the dashboard
+cp "agents/alex/agent.yaml.example" "agents/alex/agent.yaml"
 echo ""
-echo "Primary bot configured. Other agents can be added via the dashboard."
+echo "Alex configured. All other agents can be added via the dashboard."
 
 # ─── Install & build ──────────────────────────────────────────────────────────
 
