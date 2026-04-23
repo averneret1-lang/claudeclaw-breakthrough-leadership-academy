@@ -150,14 +150,7 @@ echo ""
 
 # ─── Telegram bots ────────────────────────────────────────────────────────────
 
-echo "Now configure each agent. You need one Telegram bot token per agent."
-echo "Create bots at https://t.me/BotFather — send /newbot for each one."
-echo ""
-echo "Your Telegram user ID (Alex — get from https://t.me/userinfobot):"
-read -r ADMIN_ID
-set_env "ADMIN_TELEGRAM_ID" "$ADMIN_ID"
-
-# Helper: write or update a key in .env
+# Helper: write or update a key=value in .env (bash 3 compatible)
 set_env() {
   local key="$1" val="$2"
   if grep -q "^${key}=" .env; then
@@ -167,20 +160,20 @@ set_env() {
   fi
 }
 
-declare -A TOKEN_VARS=(
-  [alex]=ALEX_BOT_TOKEN
-  [guernsy]=GUERNSY_BOT_TOKEN
-  [anne-christie]=ANNE_CHRISTIE_BOT_TOKEN
-  [angie]=ANGIE_BOT_TOKEN
-  [facilitator]=FACILITATOR_BOT_TOKEN
-  [daniel]=BLTA_DANIEL_BOT_TOKEN
-  [participant-intel]=PARTICIPANT_INTEL_BOT_TOKEN
-  [fulfillment-coach]=FULFILLMENT_COACH_BOT_TOKEN
-  [alumni]=ALUMNI_BOT_TOKEN
-  [analytics]=ANALYTICS_BOT_TOKEN
-  [legal]=LEGAL_BOT_TOKEN
-  [librarian]=LIBRARIAN_BOT_TOKEN
-)
+# Derive .env token var name from agent id (bash 3 compatible, no declare -A)
+get_token_var() {
+  case "$1" in
+    daniel) echo "BLTA_DANIEL_BOT_TOKEN" ;;
+    *) echo "$(echo "$1" | tr '[:lower:]' '[:upper:]' | tr '-' '_')_BOT_TOKEN" ;;
+  esac
+}
+
+echo "Now configure each agent. You need one Telegram bot token per agent."
+echo "Create bots at https://t.me/BotFather — send /newbot for each one."
+echo ""
+echo "Your Telegram user ID (Alex — get from https://t.me/userinfobot):"
+read -r ADMIN_ID
+set_env "ADMIN_TELEGRAM_ID" "$ADMIN_ID"
 
 for i in "${!AGENTS[@]}"; do
   agent="${AGENTS[$i]}"
@@ -201,7 +194,7 @@ for i in "${!AGENTS[@]}"; do
   echo "Telegram bot token for ${name}:"
   read -r TOKEN
 
-  TOKEN_VAR="${TOKEN_VARS[$agent]}"
+  TOKEN_VAR="$(get_token_var "$agent")"
   set_env "$TOKEN_VAR" "$TOKEN"
 
   # Facilitator: collect Eunos + Saurel IDs
@@ -220,15 +213,19 @@ done
 
 echo ""
 echo "Installing dependencies..."
-npm install
-
-echo "Installing missing type declarations..."
-npm install --save-dev \
-  @types/js-yaml@^4.0.9 \
-  @types/better-sqlite3@^7.6.12 \
-  @types/qrcode-terminal@^0.12.2 \
-  vitest@^2.0.0 \
-  2>/dev/null || true
+node -e "
+var fs = require('fs');
+var pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
+pkg.devDependencies = pkg.devDependencies || {};
+pkg.devDependencies['@types/js-yaml'] = '^4.0.9';
+pkg.devDependencies['@types/better-sqlite3'] = '^7.6.12';
+pkg.devDependencies['@types/qrcode-terminal'] = '^0.12.2';
+pkg.devDependencies['vitest'] = '^2.0.0';
+fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+console.log('package.json patched');
+"
+# NODE_ENV=development ensures devDependencies (type packages) are installed
+NODE_ENV=development npm install
 
 echo "Building project..."
 npm run build
