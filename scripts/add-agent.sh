@@ -61,8 +61,13 @@ cd "$PROJECT_DIR"
 set_env() {
   local key="$1" val="$2"
   if grep -q "^${key}=" .env; then
+    # Key exists (active) — update it
     sed -i.bak "s|^${key}=.*|${key}=${val}|" .env && rm -f .env.bak
+  elif grep -q "^# ${key}=" .env; then
+    # Key exists but commented out — uncomment and set
+    sed -i.bak "s|^# ${key}=.*|${key}=${val}|" .env && rm -f .env.bak
   else
+    # Key not present — append
     echo "${key}=${val}" >> .env
   fi
 }

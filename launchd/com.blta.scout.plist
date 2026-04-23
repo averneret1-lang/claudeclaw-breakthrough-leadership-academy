@@ -27,7 +27,7 @@
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+    <string>__NODE_DIR__:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     <key>CLAUDECLAW_AGENT_ID</key>
     <string>scout</string>
   </dict>

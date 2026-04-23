@@ -240,6 +240,7 @@ if [ "$OS" = "Darwin" ]; then
   PROJECT_DIR="$(pwd)"
   NODE_BIN="/opt/homebrew/bin/node"
   [ -f "$NODE_BIN" ] || NODE_BIN="$(which node)"
+  NODE_DIR="$(dirname "$NODE_BIN")"
 
   # Remove any stale engine plists from LaunchAgents (main/comms/content/ops/research
   # are engine defaults — BLTA does not use them)
@@ -297,7 +298,7 @@ PLIST
   for plist in launchd/com.blta.*.plist; do
     [ -f "$plist" ] || continue
     DEST="$HOME/Library/LaunchAgents/$(basename $plist)"
-    sed "s|__PROJECT_DIR__|${PROJECT_DIR}|g; s|__HOME__|${HOME}|g" "$plist" > "$DEST"
+    sed "s|__PROJECT_DIR__|${PROJECT_DIR}|g; s|__HOME__|${HOME}|g; s|__NODE_DIR__|${NODE_DIR}|g" "$plist" > "$DEST"
     launchctl unload "$DEST" 2>/dev/null || true
     launchctl load "$DEST" 2>/dev/null || true
     echo "  Loaded helper: $(basename $plist)"
