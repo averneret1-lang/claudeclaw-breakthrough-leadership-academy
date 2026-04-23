@@ -211,6 +211,19 @@ npm install --save-dev \
 echo "Building project..."
 npm run build
 
+# ─── Dashboard token ──────────────────────────────────────────────────────────
+
+if ! grep -q "^DASHBOARD_TOKEN=." .env 2>/dev/null; then
+  DASH_TOKEN=$(node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")
+  if grep -q "^DASHBOARD_TOKEN=" .env; then
+    sed -i.bak "s|^DASHBOARD_TOKEN=.*|DASHBOARD_TOKEN=$DASH_TOKEN|" .env && rm -f .env.bak
+  else
+    echo "DASHBOARD_TOKEN=$DASH_TOKEN" >> .env
+    echo "DASHBOARD_PORT=3141" >> .env
+  fi
+  echo "Dashboard token generated."
+fi
+
 # ─── Database ─────────────────────────────────────────────────────────────────
 
 echo ""
@@ -247,16 +260,19 @@ if [ "$OS" = "Darwin" ] && [ -d launchd ]; then
   done
 fi
 
+FINAL_TOKEN=$(grep "^DASHBOARD_TOKEN=" .env | cut -d'=' -f2)
 echo ""
 echo "================================================"
 echo "  Installation complete."
 echo "  System installed at: $FRAMEWORK_DIR"
 echo "  All 13 agents configured (including Scout research agent)."
 echo ""
-echo "  Start all agents:"
-echo "    cd $FRAMEWORK_DIR && npm run start:all"
+echo "  Agents are running via launchd (start on login automatically)."
 echo ""
-echo "  Check status:"
-echo "    cd $FRAMEWORK_DIR && npm run status"
+echo "  Mission Control Dashboard:"
+echo "    http://localhost:3141/dashboard?token=$FINAL_TOKEN"
+echo ""
+echo "  Check agent status:"
+echo "    launchctl list | grep claudeclaw"
 echo "================================================"
 echo ""
