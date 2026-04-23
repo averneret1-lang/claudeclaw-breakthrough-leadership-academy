@@ -1,12 +1,8 @@
-agent_id: facilitator
 name: Facilitator
-telegram_bot_token: YOUR_TELEGRAM_BOT_TOKEN_HERE
-allowed_users:
-  - EUNOS_TELEGRAM_USER_ID_HERE
-  - SAUREL_TELEGRAM_USER_ID_HERE
+description: Program facilitation — accessible by Eunos and Saurel for session ops
+telegram_bot_token_env: FACILITATOR_BOT_TOKEN
 model: claude-sonnet-4-6
-max_tokens: 2048
-mcp_servers:
-  - name: gdrive
-    command: npx
-    args: ["-y", "@modelcontextprotocol/server-gdrive"]
+
+# Facilitator is shared between Eunos and Saurel.
+# Add both their Telegram IDs to FACILITATOR_ALLOWED_IDS in .env (comma-separated).
+allowed_chat_ids_env: FACILITATOR_ALLOWED_IDS

@@ -153,8 +153,34 @@ echo ""
 echo "Now configure each agent. You need one Telegram bot token per agent."
 echo "Create bots at https://t.me/BotFather — send /newbot for each one."
 echo ""
-echo "Enter your Telegram user ID (get it from https://t.me/userinfobot):"
-read -r DEFAULT_USER_ID
+echo "Your Telegram user ID (Alex — get from https://t.me/userinfobot):"
+read -r ADMIN_ID
+set_env "ADMIN_TELEGRAM_ID" "$ADMIN_ID"
+
+# Helper: write or update a key in .env
+set_env() {
+  local key="$1" val="$2"
+  if grep -q "^${key}=" .env; then
+    sed -i.bak "s|^${key}=.*|${key}=${val}|" .env && rm -f .env.bak
+  else
+    echo "${key}=${val}" >> .env
+  fi
+}
+
+declare -A TOKEN_VARS=(
+  [alex]=ALEX_BOT_TOKEN
+  [guernsy]=GUERNSY_BOT_TOKEN
+  [anne-christie]=ANNE_CHRISTIE_BOT_TOKEN
+  [angie]=ANGIE_BOT_TOKEN
+  [facilitator]=FACILITATOR_BOT_TOKEN
+  [daniel]=BLTA_DANIEL_BOT_TOKEN
+  [participant-intel]=PARTICIPANT_INTEL_BOT_TOKEN
+  [fulfillment-coach]=FULFILLMENT_COACH_BOT_TOKEN
+  [alumni]=ALUMNI_BOT_TOKEN
+  [analytics]=ANALYTICS_BOT_TOKEN
+  [legal]=LEGAL_BOT_TOKEN
+  [librarian]=LIBRARIAN_BOT_TOKEN
+)
 
 for i in "${!AGENTS[@]}"; do
   agent="${AGENTS[$i]}"
@@ -163,34 +189,30 @@ for i in "${!AGENTS[@]}"; do
   echo ""
   echo "--- ${name} ---"
 
+  # Always copy example to actual yaml (tokens live in .env, not yaml)
   cp "agents/${agent}/agent.yaml.example" "agents/${agent}/agent.yaml"
 
-  # Scout runs in background — no Telegram bot needed
+  # Scout is background-only — no bot token
   if [ "$agent" = "scout" ]; then
-    sed -i.bak "s|YOUR_TELEGRAM_BOT_TOKEN_HERE|background-only|g" "agents/${agent}/agent.yaml"
-    sed -i.bak "s|YOUR_TELEGRAM_USER_ID_HERE|$DEFAULT_USER_ID|g" "agents/${agent}/agent.yaml"
     echo "Scout configured (background research agent — no bot token needed)."
-    rm -f "agents/${agent}/agent.yaml.bak"
     continue
   fi
 
   echo "Telegram bot token for ${name}:"
   read -r TOKEN
 
-  sed -i.bak "s|YOUR_TELEGRAM_BOT_TOKEN_HERE|$TOKEN|g" "agents/${agent}/agent.yaml"
+  TOKEN_VAR="${TOKEN_VARS[$agent]}"
+  set_env "$TOKEN_VAR" "$TOKEN"
 
+  # Facilitator: collect Eunos + Saurel IDs
   if [ "$agent" = "facilitator" ]; then
     echo "Eunos's Telegram user ID:"
     read -r EUNOS_ID
     echo "Saurel's Telegram user ID:"
     read -r SAUREL_ID
-    sed -i.bak "s|EUNOS_TELEGRAM_USER_ID_HERE|$EUNOS_ID|g" "agents/${agent}/agent.yaml"
-    sed -i.bak "s|SAUREL_TELEGRAM_USER_ID_HERE|$SAUREL_ID|g" "agents/${agent}/agent.yaml"
-  else
-    sed -i.bak "s|YOUR_TELEGRAM_USER_ID_HERE|$DEFAULT_USER_ID|g" "agents/${agent}/agent.yaml"
+    set_env "FACILITATOR_ALLOWED_IDS" "${EUNOS_ID},${SAUREL_ID}"
   fi
 
-  rm -f "agents/${agent}/agent.yaml.bak"
   echo "${name} configured."
 done
 

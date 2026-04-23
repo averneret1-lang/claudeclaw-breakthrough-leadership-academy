@@ -1,11 +1,4 @@
-agent_id: librarian
 name: Librarian
-telegram_bot_token: YOUR_TELEGRAM_BOT_TOKEN_HERE
-allowed_users:
-  - YOUR_TELEGRAM_USER_ID_HERE
+description: Knowledge base — curriculum resources, Drive organization, content retrieval
+telegram_bot_token_env: LIBRARIAN_BOT_TOKEN
 model: claude-haiku-4-5
-max_tokens: 1024
-mcp_servers:
-  - name: gdrive
-    command: npx
-    args: ["-y", "@modelcontextprotocol/server-gdrive"]

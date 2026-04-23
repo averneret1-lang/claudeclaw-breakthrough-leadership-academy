@@ -1,11 +1,4 @@
-agent_id: guernsy
 name: Guernsy
-telegram_bot_token: YOUR_TELEGRAM_BOT_TOKEN_HERE
-allowed_users:
-  - YOUR_TELEGRAM_USER_ID_HERE
+description: Operations — logistics, scheduling, venue, participant communications
+telegram_bot_token_env: GUERNSY_BOT_TOKEN
 model: claude-sonnet-4-6
-max_tokens: 2048
-mcp_servers:
-  - name: gdrive
-    command: npx
-    args: ["-y", "@modelcontextprotocol/server-gdrive"]
