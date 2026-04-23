@@ -149,7 +149,7 @@ fi
 echo "Anthropic auth complete."
 echo ""
 
-# ─── Telegram bots ────────────────────────────────────────────────────────────
+# ─── Primary bot setup ────────────────────────────────────────────────────────
 
 # Helper: write or update a key=value in .env (bash 3 compatible)
 set_env() {
@@ -161,54 +161,24 @@ set_env() {
   fi
 }
 
-# Derive .env token var name from agent id (bash 3 compatible, no declare -A)
-get_token_var() {
-  case "$1" in
-    daniel) echo "BLTA_DANIEL_BOT_TOKEN" ;;
-    *) echo "$(echo "$1" | tr '[:lower:]' '[:upper:]' | tr '-' '_')_BOT_TOKEN" ;;
-  esac
-}
-
-echo "Now configure each agent. You need one Telegram bot token per agent."
-echo "Create bots at https://t.me/BotFather — send /newbot for each one."
+echo "Create one Telegram bot via @BotFather (/newbot) — this is the Alex orchestrator."
+echo "You can add all other agents through the dashboard after install."
 echo ""
-echo "Your Telegram user ID (Alex — get from https://t.me/userinfobot):"
+echo "Your Telegram user ID (get from https://t.me/userinfobot):"
 read -r ADMIN_ID
 set_env "ADMIN_TELEGRAM_ID" "$ADMIN_ID"
 
-for i in "${!AGENTS[@]}"; do
-  agent="${AGENTS[$i]}"
-  name="${AGENT_NAMES[$i]}"
+echo ""
+echo "Alex orchestrator bot token (from @BotFather):"
+read -r ALEX_TOKEN
+set_env "ALEX_BOT_TOKEN" "$ALEX_TOKEN"
 
-  echo ""
-  echo "--- ${name} ---"
-
-  # Always copy example to actual yaml (tokens live in .env, not yaml)
-  cp "agents/${agent}/agent.yaml.example" "agents/${agent}/agent.yaml"
-
-  # Scout is background-only — no bot token
-  if [ "$agent" = "scout" ]; then
-    echo "Scout configured (background research agent — no bot token needed)."
-    continue
-  fi
-
-  echo "Telegram bot token for ${name}:"
-  read -r TOKEN
-
-  TOKEN_VAR="$(get_token_var "$agent")"
-  set_env "$TOKEN_VAR" "$TOKEN"
-
-  # Facilitator: collect Eunos + Saurel IDs
-  if [ "$agent" = "facilitator" ]; then
-    echo "Eunos's Telegram user ID:"
-    read -r EUNOS_ID
-    echo "Saurel's Telegram user ID:"
-    read -r SAUREL_ID
-    set_env "FACILITATOR_ALLOWED_IDS" "${EUNOS_ID},${SAUREL_ID}"
-  fi
-
-  echo "${name} configured."
+# Copy all agent yaml templates (no tokens needed for others yet)
+for agent in "${AGENTS[@]}"; do
+  cp "agents/${agent}/agent.yaml.example" "agents/${agent}/agent.yaml" 2>/dev/null || true
 done
+echo ""
+echo "Primary bot configured. Other agents can be added via the dashboard."
 
 # ─── Install & build ──────────────────────────────────────────────────────────
 
@@ -284,7 +254,8 @@ if [ "$OS" = "Darwin" ]; then
     rm -f "$STALE_DEST"
   done
 
-  # Generate and load a plist for each BLTA agent
+  # Generate plists for all agents (pre-baked with correct paths).
+  # Only Alex is loaded now — other agents are activated via add-agent.sh.
   BLTA_AGENTS=(alex guernsy anne-christie angie facilitator daniel participant-intel fulfillment-coach alumni analytics legal librarian)
   for agent in "${BLTA_AGENTS[@]}"; do
     LABEL="com.blta.agent.${agent}"
@@ -317,10 +288,15 @@ if [ "$OS" = "Darwin" ]; then
 </dict>
 </plist>
 PLIST
-    launchctl unload "$DEST" 2>/dev/null || true
-    launchctl load "$DEST" 2>/dev/null || true
-    echo "  Loaded agent: $agent"
+    echo "  Generated plist: $agent"
   done
+
+  # Only start Alex — the orchestrator. All others activated via the dashboard.
+  ALEX_PLIST="$HOME/Library/LaunchAgents/com.blta.agent.alex.plist"
+  launchctl unload "$ALEX_PLIST" 2>/dev/null || true
+  launchctl load "$ALEX_PLIST" 2>/dev/null || true
+  echo "  Alex agent started."
+  echo "  Other agents: activate through the dashboard when ready."
 
   # Load BLTA helper plists (scout, suggestion-watcher) from repo
   for plist in launchd/com.blta.*.plist; do
@@ -338,8 +314,9 @@ echo ""
 echo "================================================"
 echo "  Installation complete."
 echo "  System installed at: $(pwd)"
-echo "  12 agents running + Scout (background research)."
+echo "  Alex (orchestrator) is live and listening on Telegram."
 echo ""
+echo "  Add remaining agents through the Mission Control Dashboard."
 echo "  Agents start automatically on login via launchd."
 echo ""
 echo "  Mission Control Dashboard:"
@@ -347,5 +324,8 @@ echo "    http://localhost:3141/dashboard?token=$FINAL_TOKEN"
 echo ""
 echo "  Check agent status:"
 echo "    launchctl list | grep com.blta.agent"
+echo ""
+echo "  To activate an agent from the terminal:"
+echo "    bash scripts/add-agent.sh <agent-id> <bot-token>"
 echo "================================================"
 echo ""
