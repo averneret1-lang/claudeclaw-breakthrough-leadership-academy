@@ -58,7 +58,9 @@ fi
 
 echo "Installing engine dependencies..."
 cd engine
-npm install --legacy-peer-deps --timeout=120000
+# FIX: force --include=dev so TypeScript (tsc) is installed even when
+# NODE_ENV=production is set in the caller's environment.
+npm install --legacy-peer-deps --include=dev --timeout=120000
 echo "Building engine..."
 npm run build
 cd ..
@@ -238,6 +240,8 @@ PLIST
 fi
 
 FINAL_TOKEN=$(grep "^DASHBOARD_TOKEN=" .env | cut -d'=' -f2)
+FINAL_PORT=$(grep "^DASHBOARD_PORT=" .env | cut -d'=' -f2)
+FINAL_PORT="${FINAL_PORT:-3141}"
 echo ""
 echo "================================================"
 echo "  Installation complete."
@@ -248,6 +252,11 @@ echo "  Activate more agents when ready:"
 echo "    ./scripts/add-agent.sh            (interactive menu)"
 echo "    ./scripts/add-agent.sh guernsy    (single agent)"
 echo "    ./scripts/add-agent.sh --all      (all 11 remaining)"
+echo ""
+echo "  Dashboard access:"
+echo "    URL:   http://localhost:$FINAL_PORT"
+echo "    Token: $FINAL_TOKEN"
+echo "    (save this token — you'll need it to log into the dashboard)"
 echo ""
 echo "  Check status:"
 echo "    launchctl list | grep com.blta"
